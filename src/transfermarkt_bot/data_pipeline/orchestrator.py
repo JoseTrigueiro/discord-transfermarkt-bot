@@ -5,6 +5,7 @@ import time
 from typing import Any, Callable
 
 from loguru import logger
+from tqdm import tqdm
 
 from transfermarkt_bot.data_pipeline.loaders.clubs import load_club_data
 from transfermarkt_bot.data_pipeline.loaders.competitions import (
@@ -33,8 +34,8 @@ class ScrapeOrchestrator:
         self.competition_folder = base_folder + "/" + competition_folder
         self.club_folder = base_folder + "/" + club_folder
         self.player_folder = base_folder + "/" + player_folder
-        self.min_wait_time = 1  # seconds
-        self.max_wait_time = 3  # seconds
+        self.min_wait_time = 0.3  # seconds
+        self.max_wait_time = 0.7  # seconds
         self.competition_name_filter = "Tier"
 
     def run(
@@ -66,7 +67,11 @@ class ScrapeOrchestrator:
     ):
         """Generic method to scrape data and save to JSON files."""
         os.makedirs(folder, exist_ok=True)
-        for item in items:
+        for item in tqdm(items, desc=log_message, leave=True):
+            filepath = f"{folder}/{get_id_func(item)}.json"
+            if os.path.exists(filepath):
+                logger.info(f"File already exists, skipping: {filepath}")
+                continue
             logger.info(f"{log_message}: {item}")
             try:
                 data = scrape_func(item)
@@ -74,8 +79,7 @@ class ScrapeOrchestrator:
                 logger.error(f"Failed to scrape {item}: {e}")
                 continue
 
-            file_id = get_id_func(item)
-            with open(f"{folder}/{file_id}.json", "w") as f:
+            with open(filepath, "w") as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
 
             # Random wait time between requests
